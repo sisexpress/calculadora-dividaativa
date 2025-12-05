@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Calculadora de Dívida - Protótipo</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--accent:#06b6d4;--muted:#94a3b8;--glass:rgba(255,255,255,0.04)}
+    *{box-sizing:border-box;font-family:Inter,Segoe UI,Roboto,Arial,sans-serif}
+    body{margin:0;min-height:100vh;background:linear-gradient(180deg,#071025 0%, #081827 60%);color:#e6eef6}
+    .container{max-width:1100px;margin:32px auto;padding:24px}
+    header{display:flex;align-items:center;gap:16px}
+    .logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#3b82f6);display:flex;align-items:center;justify-content:center;font-weight:700;color:#042031}
+    h1{margin:0;font-size:20px}
+    p.lead{color:var(--muted);margin:6px 0 18px}
+
+    .grid{display:grid;grid-template-columns: 1fr 420px;gap:20px}
+    @media (max-width:980px){.grid{grid-template-columns:1fr}}
+
+    .card{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:18px;border-radius:12px;box-shadow:0 6px 20px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.03)}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    input[type=text], input[type=number], select{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:inherit}
+    .row{display:flex;gap:12px}
+    .row .col{flex:1}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:0;background:var(--accent);color:#022023;font-weight:600;cursor:pointer}
+    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+    .small{font-size:13px;color:var(--muted)}
+
+    .result-summary{display:flex;flex-direction:column;gap:12px}
+    .proposal{padding:12px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.02)}
+    .proposal-header{display:flex;justify-content:space-between;align-items:center}
+    .proposal-body{display:flex;gap:12px;align-items:center}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;border-bottom:1px dashed rgba(255,255,255,0.03);text-align:left;font-size:13px}
+
+    .config{margin-top:14px;padding:12px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);border:1px dashed rgba(255,255,255,0.03)}
+    .footer-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+
+    .muted-pill{padding:6px 8px;border-radius:999px;background:var(--glass);font-size:13px;color:var(--muted)}
+
+    /* print stylesheet for PDF export area */
+    @media print{
+      body{background:white;color:black}
+      .no-print{display:none}
+      .container{max-width:100%;padding:10px}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">CD</div>
+      <div>
+        <h1>Calculadora de Dívida - Protótipo</h1>
+        <p class="lead">Autoatendimento: consulte CNPJ, informe valores e gere propostas com descontos e simulações de parcelas.</p>
+      </div>
+    </header>
+
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h3>Dados do Cliente</h3>
+          <div style="margin-top:12px">
+            <label for="cnpj">CNPJ</label>
+            <div style="display:flex;gap:8px"><input id="cnpj" type="text" placeholder="Digite o CNPJ (somente números)" /><button id="btnBuscar" class="btn">Buscar</button></div>
+            <p class="small">Busca via BrasilAPI. Caso não encontre, preencha manualmente.</p>
+          </div>
+
+          <div style="margin-top:12px">
+            <label>Razão Social</label>
+            <input id="razao" type="text" />
+          </div>
+
+          <div style="margin-top:12px">
+            <label>Nome Fantasia / Responsável</label>
+            <input id="fantasia" type="text" />
+          </div>
+
+          <div style="margin-top:12px">
+            <label>Endereço</label>
+            <input id="endereco" type="text" />
+          </div>
+
+          <hr style="margin:16px 0;border:none;border-top:1px solid rgba(255,255,255,0.03)" />
+
+          <h3>Dados da Dívida</h3>
+          <div style="margin-top:8px">
+            <label>Qual valor da dívida? (R$)</label>
+            <input id="valorDivida" type="number" step="0.01" min="0" placeholder="0.00" />
+          </div>
+
+          <div style="margin-top:8px">
+            <label>Número da CDA (alfanumérico)</label>
+            <input id="cda" type="text" />
+          </div>
+
+          <div style="margin-top:8px" class="row">
+            <div class="col">
+              <label>Contrata seguro garantia?</label>
+              <select id="seguro">
+                <option value="no">Não</option>
+                <option value="yes">Sim</option>
+              </select>
+            </div>
+            <div class="col">
+              <label>Tem faturamento?</label>
+              <select id="faturamentoTem">
+                <option value="no">Não</option>
+                <option value="yes">Sim</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-top:8px">
+            <label>Se sim, qual o seu faturamento (R$)?</label>
+            <input id="faturamentoValor" type="number" step="0.01" min="0" placeholder="0.00" disabled />
+          </div>
+
+          <div class="footer-actions no-print">
+            <button id="btnCalcular" class="btn">Calcular propostas</button>
+            <button id="btnLimpar" class="btn ghost">Limpar</button>
+          </div>
+
+          <div class="config">
+            <strong class="small">Configurações (provisório)</strong>
+            <div style="margin-top:8px">
+              <label>Desconto máximo por Seguro (%)</label>
+              <input id="descontoSeguroMax" type="number" min="0" max="100" value="40" />
+            </div>
+            <div style="margin-top:8px">
+              <label>Taxa de juros mensal padrão (%)</label>
+              <input id="jurosMensal" type="number" step="0.01" min="0" value="1.5" />
+              <p class="small">No futuro integrará SELIC via Supabase; por agora usamos valor fixo configurável.</p>
+            </div>
+            <div style="margin-top:8px">
+              <label>Opções de parcelas (separe por vírgula)</label>
+              <input id="opcoesParcelas" type="text" value="1,3,6,12,24" />
+            </div>
+          </div>
+
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h3>Exportar / Imprimir</h3>
+          <p class="small">Você pode exportar a área de resultados para PDF usando impressão do navegador ou gerar um relatório simples.</p>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button id="btnPrint" class="btn">Imprimir / Salvar PDF</button>
+            <button id="btnExportJSON" class="btn ghost">Exportar JSON</button>
+          </div>
+        </div>
+
+      </div>
+
+      <aside>
+        <div class="card">
+          <h3>Propostas & Simulações</h3>
+          <div id="areaResultados" style="margin-top:12px">
+            <p class="small">Nenhuma simulação ainda. Preencha os dados e clique em <strong>Calcular propostas</strong>.</p>
+          </div>
+
+          <div class="no-print" style="margin-top:12px">
+            <label>Escolha uma proposta para ver tabela de parcelas</label>
+            <select id="selecionaProposta">
+              <option value="">-- nenhuma --</option>
+            </select>
+          </div>
+
+          <div id="tabelaParcelas" style="margin-top:12px"></div>
+        </div>
+      </aside>
+    </div>
+
+    <footer style="margin-top:18px;color:var(--muted);font-size:13px">Protótipo — calculadora de dívida. Desenvolvido para autoatendimento by Eduardo-Acrox Bank.</footer>
+  </div>
+
+  <script>
+    // --- Helpers ---
+    const $ = id => document.getElementById(id);
+
+    function onlyDigits(s){return (s||'').toString().replace(/\D/g,'')}
+    function money(v){return Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+
+    // PRICE (sistema francês) - parcela fixa
+    function calcPrice(valor, jurosMensal, n){
+      const i = jurosMensal/100;
+      if(i === 0) return {parcela: valor/n, total: valor, jurosTotal:0};
+      const parcela = valor * (i / (1 - Math.pow(1+i, -n)));
+      const total = parcela * n;
+      const jurosTotal = total - valor;
+      return {parcela, total, jurosTotal};
+    }
+
+    // --- UI bindings ---
+    $('faturamentoTem').addEventListener('change',(e)=>{
+      $('faturamentoValor').disabled = e.target.value === 'no';
+    });
+
+    // Buscar CNPJ via BrasilAPI
+    $('btnBuscar').addEventListener('click', async ()=>{
+      const raw = onlyDigits($('cnpj').value);
+      if(raw.length < 14){alert('Informe um CNPJ com 14 dígitos'); return}
+      const cnpj = raw;
+      $('btnBuscar').disabled = true; $('btnBuscar').textContent = 'Buscando...';
+      try{
+        const res = await fetch('https://brasilapi.com.br/api/cnpj/v1/'+cnpj);
+        if(!res.ok) throw new Error('Não encontrado');
+        const data = await res.json();
+        // Map fields
+        $('razao').value = data.razao_social || data.nome || '';
+        $('fantasia').value = (data.nome_fantasia || data.atividade_principal?.map(a=>a.text).join(', ') || '') + (data.eh_mei ? ' (MEI)':'');
+        const addrParts = [];
+        if(data.estabelecimento && data.estabelecimento.endereco){
+          const e = data.estabelecimento.endereco;
+          addrParts.push(e.logradouro, e.numero, e.complemento, e.bairro, e.municipio, e.uf, e.cep);
+        }
+        $('endereco').value = addrParts.filter(Boolean).join(', ');
+      }catch(err){
+        console.error(err);
+        alert('Erro ao buscar CNPJ: '+err.message+'. Você pode preencher manualmente.');
+      }finally{
+        $('btnBuscar').disabled = false; $('btnBuscar').textContent = 'Buscar';
+      }
+    });
+
+    // Limpar
+    $('btnLimpar').addEventListener('click', ()=>{
+      ['cnpj','razao','fantasia','endereco','valorDivida','cda','faturamentoValor'].forEach(id=>$(id).value='');
+      $('seguro').value='no'; $('faturamentoTem').value='no';
+      $('areaResultados').innerHTML = '<p class="small">Nenhuma simulação ainda. Preencha os dados e clique em <strong>Calcular propostas</strong>.</p>';
+      $('selecionaProposta').innerHTML = '<option value="">-- nenhuma --</option>';
+      $('tabelaParcelas').innerHTML='';
+    });
+
+    // Calcular propostas
+    $('btnCalcular').addEventListener('click', ()=>{
+      const valor = parseFloat($('valorDivida').value || 0);
+      if(!valor || valor <= 0){alert('Informe o valor da dívida'); return}
+      const seguro = $('seguro').value === 'yes';
+      const descontoSeguroMax = Number($('descontoSeguroMax').value) || 0;
+      const jurosMensal = Number($('jurosMensal').value) || 1.5;
+      const opcoes = ($('opcoesParcelas').value || '1,6,12').split(',').map(s=>parseInt(s.trim())).filter(n=>Number.isInteger(n) && n>0);
+
+      // Build proposals list
+      const proposals = [];
+
+      // Proposal: à vista (1 parcela) with maximum discount if insurance
+      const baseDesconto = seguro ? descontoSeguroMax : 0; // %
+      // We'll make a few tiers: à vista extra, parcelado com desconto parcial
+      // à vista - desconto total do seguro
+      proposals.push({
+        id: 'avista',
+        title: 'À vista (liquidação única)',
+        parcelas: 1,
+        descontoPercent: baseDesconto,
+        jurosMensal: 0
+      });
+
+      // Other parcel options: for each n create two variants: com desconto (menor) e sem desconto
+      opcoes.forEach(n=>{
+        if(n === 1) return; // já temos à vista
+        // desconto diminui com o número de parcelas
+        // regra simples: desconto aplicado = baseDesconto * (1 - (n/Math.max(...opcoes))) — demonstrativo, configurável
+        const maxN = Math.max(...opcoes);
+        const descontoAplicado = Math.round(baseDesconto * Math.max(0, 1 - (n-1)/(maxN))) ;
+        proposals.push({id:`p_${n}`, title:`${n}x`, parcelas:n, descontoPercent:descontoAplicado, jurosMensal:jurosMensal});
+      });
+
+      renderProposals(valor, proposals);
+
+    });
+
+    function renderProposals(valorOriginal, proposals){
+      const area = $('areaResultados');
+      area.innerHTML='';
+      const sel = $('selecionaProposta'); sel.innerHTML='<option value="">-- nenhuma --</option>';
+
+      proposals.forEach((p, idx)=>{
+        const div = document.createElement('div'); div.className='proposal';
+        const header = document.createElement('div'); header.className='proposal-header';
+        const left = document.createElement('div'); left.innerHTML=`<strong>${p.title}</strong><div class="small">${p.parcelas} parcela(s)</div>`;
+        const right = document.createElement('div'); right.innerHTML=`<div style="text-align:right"><div class="muted-pill">Desconto ${p.descontoPercent}%</div><div style="font-weight:700;margin-top:6px">`+money(valorOriginal * (1 - p.descontoPercent/100))+`</div></div>`;
+        header.appendChild(left); header.appendChild(right);
+        div.appendChild(header);
+
+        const body = document.createElement('div'); body.className='proposal-body';
+        const btnView = document.createElement('button'); btnView.className='btn ghost'; btnView.textContent='Ver detalhes';
+        btnView.addEventListener('click', ()=>{
+          // select this proposal in the dropdown to show table
+          sel.value = p.id; sel.dispatchEvent(new Event('change'));
+        });
+        body.appendChild(btnView);
+
+        const summary = document.createElement('div'); summary.style.marginLeft='8px';
+        const valorLiquido = valorOriginal * (1 - p.descontoPercent/100);
+        const calc = calcPrice(valorLiquido, p.jurosMensal || 0, p.parcelas);
+        summary.innerHTML = `<div class="small">Parcela estimada: <strong>${money(calc.parcela)}</strong></div><div class="small">Total pago: <strong>${money(calc.total)}</strong> (Juros ${money(calc.jurosTotal)})</div>`;
+        body.appendChild(summary);
+
+        div.appendChild(body);
+        area.appendChild(div);
+
+        // fill select
+        const opt = document.createElement('option'); opt.value = p.id; opt.textContent = `${p.title} — ${p.parcelas}x — ${p.descontoPercent}% desconto`; sel.appendChild(opt);
+      });
+
+      // save proposals in-memory
+      window._proposals_cache = {valorOriginal, proposals};
+
+    }
+
+    // Show table when selecting a proposal
+    $('selecionaProposta').addEventListener('change', (e)=>{
+      const id = e.target.value; const cache = window._proposals_cache;
+      const area = $('tabelaParcelas'); area.innerHTML='';
+      if(!id || !cache) return;
+      const p = cache.proposals.find(x=>x.id===id);
+      if(!p) return;
+      // compute schedule
+      const valorLiquido = cache.valorOriginal * (1 - p.descontoPercent/100);
+      const {parcela, total, jurosTotal} = calcPrice(valorLiquido, p.jurosMensal || 0, p.parcelas);
+
+      const info = document.createElement('div'); info.className='card'; info.style.marginTop='8px';
+      info.innerHTML = `<strong>Simulação: ${p.title}</strong><div class="small">Valor líquido: ${money(valorLiquido)} • Parcela fixa estimada: ${money(parcela)} • Total: ${money(total)} • Juros: ${money(jurosTotal)}</div>`;
+
+      // create table
+      const table = document.createElement('table');
+      const thead = document.createElement('thead'); thead.innerHTML = '<tr><th>#</th><th>Parcela</th><th>Saldo Devedor</th><th>Amortização</th><th>Juros</th></tr>';
+      table.appendChild(thead);
+      const tbody = document.createElement('tbody');
+
+      // For PRICE the amortization grows; we compute schedule iteratively
+      let saldo = valorLiquido;
+      for(let k=1;k<=p.parcelas;k++){
+        const juros = saldo * ( (p.jurosMensal||0)/100 );
+        const amort = parcela - juros;
+        const saldoNovo = Math.max(0, saldo - amort);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${k}</td><td>${money(parcela)}</td><td>${money(saldo)}</td><td>${money(amort)}</td><td>${money(juros)}</td>`;
+        tbody.appendChild(tr);
+        saldo = saldoNovo;
+      }
+      table.appendChild(tbody);
+
+      area.appendChild(info); area.appendChild(table);
+
+      // Also render a summary area for printing
+      const printArea = document.createElement('div'); printArea.id='printableReport'; printArea.style.display='none';
+      printArea.innerHTML = `<h2>Relatório de Proposta</h2><p>${document.querySelector('h1').textContent}</p>`;
+      area.appendChild(printArea);
+
+    });
+
+    // Print / Save PDF
+    $('btnPrint').addEventListener('click', ()=>{
+      window.print();
+    });
+
+    // Export JSON
+    $('btnExportJSON').addEventListener('click', ()=>{
+      const cache = window._proposals_cache || {};
+      const payload = {
+        timestamp: new Date().toISOString(),
+        empresa: {
+          cnpj: $('cnpj').value,
+          razao: $('razao').value,
+          fantasia: $('fantasia').value,
+          endereco: $('endereco').value
+        },
+        divida: {
+          valor: Number($('valorDivida').value||0),
+          cda: $('cda').value,
+          seguro: $('seguro').value,
+          faturamentoTem: $('faturamentoTem').value,
+          faturamentoValor: Number($('faturamentoValor').value||0)
+        },
+        calculoConfig: {
+          descontoSeguroMax: Number($('descontoSeguroMax').value)||0,
+          jurosMensal: Number($('jurosMensal').value)||1.5,
+          opcoesParcelas: ($('opcoesParcelas').value||'').split(',').map(s=>s.trim())
+        },
+        resultados: cache
+      };
+      const blob = new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'proposta_divida.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    });
+
+    // Accessibility / small niceties
+    document.addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter' && document.activeElement === $('cnpj')){ e.preventDefault(); $('btnBuscar').click(); }
+    });
+
+    // Init: set faturamento disabled
+    $('faturamentoValor').disabled = true;
+
+    // NOTES for future integration (comments):
+    /*
+      - Hoje usamos BrasilAPI para buscar CNPJ. Se for necessária autenticação ou alta disponibilidade, trocar por proxy backend.
+      - A lógica de descontos é configurável no painel. Você pediu: seguro permite até 40% — deixamos isso como valor padrão.
+      - Juros mensais padrão configurável (1.5%). Futuramente podemos buscar SELIC via Supabase e recalcular.
+      - Export JSON/Imprimir pronto; se quiser gerar PDF com layout customizado (multipage), podemos integrar jsPDF ou backend.
+      - Para produção: validar CNPJ com máscara e adicionar tratamento de erros mais robusto.
+    */
+
+  </script>
+</body>
+</html>
