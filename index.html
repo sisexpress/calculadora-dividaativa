@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Calculadora de Dívida - Protótipo</title>
   <style>
+    /* Toggle Switch */
+    .switch{position:relative;display:inline-block;width:46px;height:24px}
+    .switch input{opacity:0;width:0;height:0}
+    .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#4b5563;border-radius:24px;transition:.3s}
+    .slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s}
+    input:checked + .slider{background:var(--accent)}
+    input:checked + .slider:before{transform:translateX(22px)}
+
     :root{--bg:#0f1724;--card:#0b1220;--accent:#06b6d4;--muted:#94a3b8;--glass:rgba(255,255,255,0.04)}
     *{box-sizing:border-box;font-family:Inter,Segoe UI,Roboto,Arial,sans-serif}
     body{margin:0;min-height:100vh;background:linear-gradient(180deg,#071025 0%, #081827 60%);color:#e6eef6}
@@ -86,7 +94,7 @@
           <h3>Dados da Dívida</h3>
           <div style="margin-top:8px">
             <label>Qual valor da dívida? (R$)</label>
-            <input id="valorDivida" type="number" step="0.01" min="0" placeholder="0.00" />
+            <input id="valorDivida" type="text" placeholder="R$ 0,00" />
           </div>
 
           <div style="margin-top:8px">
@@ -97,23 +105,17 @@
           <div style="margin-top:8px" class="row">
             <div class="col">
               <label>Contrata seguro garantia?</label>
-              <select id="seguro">
-                <option value="no">Não</option>
-                <option value="yes">Sim</option>
-              </select>
+              <label class="switch"><input id="seguro" type="checkbox"><span class="slider"></span></label>
             </div>
             <div class="col">
               <label>Tem faturamento?</label>
-              <select id="faturamentoTem">
-                <option value="no">Não</option>
-                <option value="yes">Sim</option>
-              </select>
+              <label class="switch"><input id="faturamentoTem" type="checkbox"><span class="slider"></span></label>
             </div>
           </div>
 
           <div style="margin-top:8px">
             <label>Se sim, qual o seu faturamento (R$)?</label>
-            <input id="faturamentoValor" type="number" step="0.01" min="0" placeholder="0.00" disabled />
+            <input id="faturamentoValor" type="text" placeholder="R$ 0,00" disabled />
           </div>
 
           <div class="footer-actions no-print">
@@ -170,7 +172,7 @@
       </aside>
     </div>
 
-    <footer style="margin-top:18px;color:var(--muted);font-size:13px">Protótipo — calculadora de dívida. Desenvolvido para autoatendimento by Eduardo-Acrox Bank.</footer>
+    <footer style="margin-top:18px;color:var(--muted);font-size:13px">Protótipo — calculadora de dívida. Integração com BrasilAPI (CNPJ) configurada. Desenvolvido para autoatendimento.</footer>
   </div>
 
   <script>
@@ -178,7 +180,41 @@
     const $ = id => document.getElementById(id);
 
     function onlyDigits(s){return (s||'').toString().replace(/\D/g,'')}
-    function money(v){return Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+    function money(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+
+    // parse currency strings like "R$ 1.234,56" or "1234,56" into number (float)
+    function parseCurrencyString(s){
+      if(!s) return 0;
+      const digits = (s||'').toString().replace(/\D/g,'');
+      if(digits==='') return 0;
+      return parseInt(digits,10)/100;
+    }
+
+    // auto format currency for inputs
+    function attachCurrencyMask(id){
+      const el = $(id);
+      if(!el) return;
+      el.addEventListener('input',()=>{
+        const caret = el.selectionStart;
+        let raw = el.value.replace(/\D/g,'');
+        if(raw==='') { el.value=''; return; }
+        const num = (parseInt(raw,10)/100).toFixed(2);
+        el.value = Number(num).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+        // try to restore caret near end
+        el.setSelectionRange(el.value.length, el.value.length);
+      });
+      el.addEventListener('focus',()=>{
+        // remove formatting so user can type digits
+        const n = el.value.replace(/\D/g,'');
+        el.value = n;
+      });
+      el.addEventListener('blur',()=>{
+        const raw = el.value.replace(/\D/g,'');
+        if(raw==='') { el.value=''; return; }
+        const num = (parseInt(raw,10)/100).toFixed(2);
+        el.value = Number(num).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+      });
+    }
 
     // PRICE (sistema francês) - parcela fixa
     function calcPrice(valor, jurosMensal, n){
@@ -191,8 +227,11 @@
     }
 
     // --- UI bindings ---
+    // faturamento checkbox toggles input
     $('faturamentoTem').addEventListener('change',(e)=>{
-      $('faturamentoValor').disabled = e.target.value === 'no';
+      const checked = e.target.checked;
+      $('faturamentoValor').disabled = !checked;
+      if(!checked) $('faturamentoValor').value = '';
     });
 
     // Buscar CNPJ via BrasilAPI
@@ -207,7 +246,7 @@
         const data = await res.json();
         // Map fields
         $('razao').value = data.razao_social || data.nome || '';
-        $('fantasia').value = (data.nome_fantasia || data.atividade_principal?.map(a=>a.text).join(', ') || '') + (data.eh_mei ? ' (MEI)':'');
+        $('fantasia').value = (data.nome_fantasia || (data.atividade_principal||[]).map(a=>a.text).join(', ') || '') + (data.eh_mei ? ' (MEI)':'');
         const addrParts = [];
         if(data.estabelecimento && data.estabelecimento.endereco){
           const e = data.estabelecimento.endereco;
@@ -225,7 +264,7 @@
     // Limpar
     $('btnLimpar').addEventListener('click', ()=>{
       ['cnpj','razao','fantasia','endereco','valorDivida','cda','faturamentoValor'].forEach(id=>$(id).value='');
-      $('seguro').value='no'; $('faturamentoTem').value='no';
+      $('seguro').checked = false; $('faturamentoTem').checked = false; $('faturamentoValor').disabled = true;
       $('areaResultados').innerHTML = '<p class="small">Nenhuma simulação ainda. Preencha os dados e clique em <strong>Calcular propostas</strong>.</p>';
       $('selecionaProposta').innerHTML = '<option value="">-- nenhuma --</option>';
       $('tabelaParcelas').innerHTML='';
@@ -233,9 +272,9 @@
 
     // Calcular propostas
     $('btnCalcular').addEventListener('click', ()=>{
-      const valor = parseFloat($('valorDivida').value || 0);
+      const valor = parseCurrencyString($('valorDivida').value);
       if(!valor || valor <= 0){alert('Informe o valor da dívida'); return}
-      const seguro = $('seguro').value === 'yes';
+      const seguro = $('seguro').checked;
       const descontoSeguroMax = Number($('descontoSeguroMax').value) || 0;
       const jurosMensal = Number($('jurosMensal').value) || 1.5;
       const opcoes = ($('opcoesParcelas').value || '1,6,12').split(',').map(s=>parseInt(s.trim())).filter(n=>Number.isInteger(n) && n>0);
@@ -245,8 +284,6 @@
 
       // Proposal: à vista (1 parcela) with maximum discount if insurance
       const baseDesconto = seguro ? descontoSeguroMax : 0; // %
-      // We'll make a few tiers: à vista extra, parcelado com desconto parcial
-      // à vista - desconto total do seguro
       proposals.push({
         id: 'avista',
         title: 'À vista (liquidação única)',
@@ -255,12 +292,10 @@
         jurosMensal: 0
       });
 
-      // Other parcel options: for each n create two variants: com desconto (menor) e sem desconto
+      // Other parcel options
+      const maxN = Math.max(...opcoes);
       opcoes.forEach(n=>{
         if(n === 1) return; // já temos à vista
-        // desconto diminui com o número de parcelas
-        // regra simples: desconto aplicado = baseDesconto * (1 - (n/Math.max(...opcoes))) — demonstrativo, configurável
-        const maxN = Math.max(...opcoes);
         const descontoAplicado = Math.round(baseDesconto * Math.max(0, 1 - (n-1)/(maxN))) ;
         proposals.push({id:`p_${n}`, title:`${n}x`, parcelas:n, descontoPercent:descontoAplicado, jurosMensal:jurosMensal});
       });
@@ -285,7 +320,6 @@
         const body = document.createElement('div'); body.className='proposal-body';
         const btnView = document.createElement('button'); btnView.className='btn ghost'; btnView.textContent='Ver detalhes';
         btnView.addEventListener('click', ()=>{
-          // select this proposal in the dropdown to show table
           sel.value = p.id; sel.dispatchEvent(new Event('change'));
         });
         body.appendChild(btnView);
@@ -299,11 +333,9 @@
         div.appendChild(body);
         area.appendChild(div);
 
-        // fill select
         const opt = document.createElement('option'); opt.value = p.id; opt.textContent = `${p.title} — ${p.parcelas}x — ${p.descontoPercent}% desconto`; sel.appendChild(opt);
       });
 
-      // save proposals in-memory
       window._proposals_cache = {valorOriginal, proposals};
 
     }
@@ -315,20 +347,17 @@
       if(!id || !cache) return;
       const p = cache.proposals.find(x=>x.id===id);
       if(!p) return;
-      // compute schedule
       const valorLiquido = cache.valorOriginal * (1 - p.descontoPercent/100);
       const {parcela, total, jurosTotal} = calcPrice(valorLiquido, p.jurosMensal || 0, p.parcelas);
 
       const info = document.createElement('div'); info.className='card'; info.style.marginTop='8px';
       info.innerHTML = `<strong>Simulação: ${p.title}</strong><div class="small">Valor líquido: ${money(valorLiquido)} • Parcela fixa estimada: ${money(parcela)} • Total: ${money(total)} • Juros: ${money(jurosTotal)}</div>`;
 
-      // create table
       const table = document.createElement('table');
       const thead = document.createElement('thead'); thead.innerHTML = '<tr><th>#</th><th>Parcela</th><th>Saldo Devedor</th><th>Amortização</th><th>Juros</th></tr>';
       table.appendChild(thead);
       const tbody = document.createElement('tbody');
 
-      // For PRICE the amortization grows; we compute schedule iteratively
       let saldo = valorLiquido;
       for(let k=1;k<=p.parcelas;k++){
         const juros = saldo * ( (p.jurosMensal||0)/100 );
@@ -343,7 +372,6 @@
 
       area.appendChild(info); area.appendChild(table);
 
-      // Also render a summary area for printing
       const printArea = document.createElement('div'); printArea.id='printableReport'; printArea.style.display='none';
       printArea.innerHTML = `<h2>Relatório de Proposta</h2><p>${document.querySelector('h1').textContent}</p>`;
       area.appendChild(printArea);
@@ -367,11 +395,11 @@
           endereco: $('endereco').value
         },
         divida: {
-          valor: Number($('valorDivida').value||0),
+          valor: parseCurrencyString($('valorDivida').value),
           cda: $('cda').value,
-          seguro: $('seguro').value,
-          faturamentoTem: $('faturamentoTem').value,
-          faturamentoValor: Number($('faturamentoValor').value||0)
+          seguro: !!$('seguro').checked,
+          faturamentoTem: !!$('faturamentoTem').checked,
+          faturamentoValor: parseCurrencyString($('faturamentoValor').value)
         },
         calculoConfig: {
           descontoSeguroMax: Number($('descontoSeguroMax').value)||0,
@@ -390,7 +418,9 @@
       if(e.key === 'Enter' && document.activeElement === $('cnpj')){ e.preventDefault(); $('btnBuscar').click(); }
     });
 
-    // Init: set faturamento disabled
+    // Init: set faturamento disabled and attach masks
+    attachCurrencyMask('valorDivida');
+    attachCurrencyMask('faturamentoValor');
     $('faturamentoValor').disabled = true;
 
     // NOTES for future integration (comments):
@@ -405,3 +435,4 @@
   </script>
 </body>
 </html>
+
