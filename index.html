@@ -46,6 +46,10 @@
 
     .muted-pill{padding:6px 8px;border-radius:999px;background:var(--glass);font-size:13px;color:var(--muted)}
 
+    /* small green company card styling for visibility */
+    .company-card{display:none;margin-bottom:20px;padding:12px;border-radius:10px;background:#e8f9ef;border:1px solid #b6e6c4;color:#1b5e20}
+    .company-card h4{margin:0 0 8px 0}
+
     /* print stylesheet for PDF export area */
     @media print{
       body{background:white;color:black}
@@ -56,6 +60,34 @@
 </head>
 <body>
   <div class="container">
+
+    <!-- CARD DE EMPRESA ENCONTRADA -->
+    <div id="cardEmpresa" class="company-card" aria-live="polite">
+      <div style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px;margin-bottom:8px">
+        <span style="font-size:18px">✔</span>
+        <span>Empresa encontrada</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;color:#1b5e20">
+        <div>
+          <strong>Razão Social</strong><br>
+          <span id="cardRazao">-</span>
+        </div>
+        <div>
+          <strong>Nome Fantasia</strong><br>
+          <span id="cardFantasia">-</span>
+        </div>
+        <div>
+          <strong>Responsável</strong><br>
+          <span id="cardResponsavel">-</span>
+        </div>
+        <div>
+          <strong>Endereço</strong><br>
+          <span id="cardEndereco">-</span>
+        </div>
+      </div>
+    </div>
+    <!-- FIM DO CARD -->
+
     <header>
       <div class="logo">CD</div>
       <div>
@@ -74,20 +106,23 @@
             <p class="small">Busca via BrasilAPI. Caso não encontre, preencha manualmente.</p>
           </div>
 
-          <div style="margin-top:12px">
-            <label>Razão Social</label>
-            <input id="razao" type="text" />
-          </div>
+          <button id="btnEditarDados" class="btn ghost" style="margin-top:12px">Editar dados manualmente</button>
+<div id="dadosManuais" style="display:none">
+  <div style="margin-top:12px">
+    <label>Razão Social</label>
+    <input id="razao" type="text" />
+  </div>
 
-          <div style="margin-top:12px">
-            <label>Nome Fantasia / Responsável</label>
-            <input id="fantasia" type="text" />
-          </div>
+  <div style="margin-top:12px">
+    <label>Nome Fantasia / Responsável</label>
+    <input id="fantasia" type="text" />
+  </div>
 
-          <div style="margin-top:12px">
-            <label>Endereço</label>
-            <input id="endereco" type="text" />
-          </div>
+  <div style="margin-top:12px">
+    <label>Endereço</label>
+    <input id="endereco" type="text" />
+  </div>
+</div>
 
           <hr style="margin:16px 0;border:none;border-top:1px solid rgba(255,255,255,0.03)" />
 
@@ -226,7 +261,13 @@
       return {parcela, total, jurosTotal};
     }
 
-    // --- UI bindings ---
+    // botão para mostrar/ocultar dados manuais
+$('btnEditarDados').addEventListener('click',()=>{
+  const box = $('dadosManuais');
+  box.style.display = box.style.display==='none' ? 'block' : 'none';
+});
+
+// --- UI bindings ---
     // faturamento checkbox toggles input
     $('faturamentoTem').addEventListener('change',(e)=>{
       const checked = e.target.checked;
@@ -244,15 +285,30 @@
         const res = await fetch('https://brasilapi.com.br/api/cnpj/v1/'+cnpj);
         if(!res.ok) throw new Error('Não encontrado');
         const data = await res.json();
-        // Map fields
+        // Map fields (corrigido para MEI e card)
+        // Razão Social
         $('razao').value = data.razao_social || data.nome || '';
-        $('fantasia').value = (data.nome_fantasia || (data.atividade_principal||[]).map(a=>a.text).join(', ') || '') + (data.eh_mei ? ' (MEI)':'');
-        const addrParts = [];
-        if(data.estabelecimento && data.estabelecimento.endereco){
-          const e = data.estabelecimento.endereco;
-          addrParts.push(e.logradouro, e.numero, e.complemento, e.bairro, e.municipio, e.uf, e.cep);
-        }
-        $('endereco').value = addrParts.filter(Boolean).join(', ');
+
+        // Nome Fantasia (sem fallback estranho e sem '(MEI)')
+        $('fantasia').value = data.nome_fantasia || data.razao_social || '';
+
+        // Endereço
+        let endereco = [
+          data.logradouro,
+          data.numero,
+          data.complemento,
+          data.bairro,
+          `${data.municipio} - ${data.uf}`,
+          `CEP: ${data.cep}`
+        ].filter(Boolean).join(', ');
+        $('endereco').value = endereco;
+
+        // Preencher CARD
+        $('cardRazao').textContent = $('razao').value || '-';
+        $('cardFantasia').textContent = $('fantasia').value || '-';
+        $('cardResponsavel').textContent = data.razao_social || '-';
+        $('cardEndereco').textContent = endereco || '-';
+        $('cardEmpresa').style.display = 'block';
       }catch(err){
         console.error(err);
         alert('Erro ao buscar CNPJ: '+err.message+'. Você pode preencher manualmente.');
@@ -435,4 +491,3 @@
   </script>
 </body>
 </html>
-
