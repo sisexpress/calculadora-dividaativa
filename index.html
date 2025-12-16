@@ -69,25 +69,43 @@
         <span>Empresa encontrada</span>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;color:#1b5e20">
-        <div>
-          <strong>Razão Social</strong><br>
-          <span id="cardRazao">-</span>
-        </div>
-        <div>
-          <strong>Nome Fantasia</strong><br>
-          <span id="cardFantasia">-</span>
-        </div>
-        <div>
-          <strong>Responsável</strong><br>
-          <span id="cardResponsavel">-</span>
-        </div>
-        <div>
-          <strong>Endereço</strong><br>
-          <span id="cardEndereco">-</span>
-        </div>
+        <div><strong>Razão Social</strong><br><span id="cardRazao">-</span></div>
+        <div><strong>Nome Fantasia</strong><br><span id="cardFantasia">-</span></div>
+        <div><strong>Responsável</strong><br><span id="cardResponsavel">-</span></div>
+        <div><strong>Endereço</strong><br><span id="cardEndereco">-</span></div>
       </div>
     </div>
-    <!-- FIM DO CARD -->
+
+    <!-- CARD DIVIDA ATIVA (MOCK) -->
+    <div id="cardDividaAtiva" class="company-card" style="display:none">
+      <div style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px;margin-bottom:8px">
+        <span style="font-size:18px">📌</span>
+        <span>Dívida Ativa da União (estimativa)</span>
+      </div>
+      <div style="font-size:13px;color:#1b5e20;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <strong>Valor total estimado</strong><br>
+          <span id="dividaValor">R$ 0,00</span>
+        </div>
+        <div>
+          <strong>Quantidade de inscrições</strong><br>
+          <span id="dividaQtd">-</span>
+        </div>
+        <div>
+          <strong>Tipo de dívida</strong><br>
+          <span id="dividaTipos">-</span>
+        </div>
+        <div>
+          <strong>Situação</strong><br>
+          <span id="dividaSituacao">ATIVA</span>
+        </div>
+      </div>
+      <p style="margin-top:8px;font-size:12px;color:#256029">
+        ℹ️ Valores estimados a partir de dados públicos. O valor oficial pode sofrer atualizações.
+      </p>
+      <button id="btnUsarDivida" class="btn" style="margin-top:8px">Simular parcelamento desta dívida</button>
+    </div>
+    <!-- FIM CARD DIVIDA -->
 
     <header>
       <div class="logo">CD</div>
@@ -178,8 +196,8 @@
             <div style="margin-top:8px">
               <label>Taxa de juros mensal padrão (%)</label>
               <input id="jurosMensal" type="number" step="0.01" min="0" value="1.5" />
-              <p class="small">Selic da base do Banco Central.</p>
-            </div>  
+              <p class="small">No futuro integrará SELIC via Supabase; por agora usamos valor fixo configurável.</p>
+            </div>
             <div style="margin-top:8px">
               <label>Opções de parcelas (separe por vírgula)</label>
               <input id="opcoesParcelas" type="text" value="1,3,6,12,24" />
@@ -296,15 +314,12 @@ $('btnEditarDados').addEventListener('click',()=>{
         const res = await fetch('https://brasilapi.com.br/api/cnpj/v1/'+cnpj);
         if(!res.ok) throw new Error('Não encontrado');
         const data = await res.json();
-        // Map fields (corrigido para MEI e card)
-        // Razão Social
-        $('razao').value = data.razao_social || data.nome || '';
 
-        // Nome Fantasia (sem fallback estranho e sem '(MEI)')
+        $('razao').value = data.razao_social || '';
         $('fantasia').value = data.nome_fantasia || data.razao_social || '';
 
-        // Endereço
-        let endereco = [
+        let endereco = '';
+        endereco = [
           data.logradouro,
           data.numero,
           data.complemento,
@@ -314,12 +329,13 @@ $('btnEditarDados').addEventListener('click',()=>{
         ].filter(Boolean).join(', ');
         $('endereco').value = endereco;
 
-        // Preencher CARD
         $('cardRazao').textContent = $('razao').value || '-';
         $('cardFantasia').textContent = $('fantasia').value || '-';
-        $('cardResponsavel').textContent = data.razao_social || '-';
+        $('cardResponsavel').textContent = '-';
         $('cardEndereco').textContent = endereco || '-';
         $('cardEmpresa').style.display = 'block';
+
+        renderDividaAtivaMock();
       }catch(err){
         console.error(err);
         alert('Erro ao buscar CNPJ: '+err.message+'. Você pode preencher manualmente.');
@@ -327,6 +343,7 @@ $('btnEditarDados').addEventListener('click',()=>{
         $('btnBuscar').disabled = false; $('btnBuscar').textContent = 'Buscar';
       }
     });
+   
 
     // Limpar
     $('btnLimpar').addEventListener('click', ()=>{
@@ -555,6 +572,27 @@ $('btnEditarDados').addEventListener('click',()=>{
     attachCurrencyMask('valorDivida');
     attachCurrencyMask('faturamentoValor');
     $('faturamentoValor').disabled = true;
+
+    // MOCK DIVIDA ATIVA
+    const mockDividaAtiva = {
+      total: 28500.45,
+      quantidade: 3,
+      tipos: ['Não Previdenciária', 'Previdenciária'],
+      situacao: 'ATIVA'
+    };
+
+    function renderDividaAtivaMock(){
+      $('dividaValor').textContent = money(mockDividaAtiva.total);
+      $('dividaQtd').textContent = mockDividaAtiva.quantidade + ' inscrições';
+      $('dividaTipos').innerHTML = mockDividaAtiva.tipos.map(t=>'• '+t).join('<br>');
+      $('dividaSituacao').textContent = mockDividaAtiva.situacao;
+      $('cardDividaAtiva').style.display = 'block';
+    }
+
+    $('btnUsarDivida').addEventListener('click', ()=>{
+      $('valorDivida').value = money(mockDividaAtiva.total);
+      $('valorDivida').scrollIntoView({behavior:'smooth'});
+    });
 
     // NOTES for future integration (comments):
     /*
